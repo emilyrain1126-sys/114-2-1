@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>114-2一段複習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        .animate-zoom-in { animation: zoomIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .team-row-active { background-color: #f0f9ff; border-left: 4px solid #3b82f6; }
+
+        /* 讓文字支援換行 */
+        #modal-question-text, #modal-answer-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            transition: font-size 0.2s ease;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        /* 慶祝動畫 */
+        .confetti { position: absolute; width: 10px; height: 10px; background-color: #f00; animation: confetti-fall 3s linear infinite; }
+        @keyframes confetti-fall { 
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* 倒計時警告動畫 */
+        .timer-warning { animation: pulse-red 0.5s infinite; color: #ef4444; }
+        @keyframes pulse-red {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* 字體按鈕激活樣式 */
+        .font-btn-active { background-color: #3b82f6 !important; color: white !important; }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans min-h-screen">
+
+    <!-- 設定畫面 -->
+    <div id="setup-screen" class="min-h-screen flex items-center justify-center p-6">
+        <div class="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center animate-zoom-in">
+            <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="trophy" size="40"></i>
+            </div>
+            <h1 class="text-3xl font-black text-slate-800 mb-2">114-2一段複習</h1>
+            <div class="bg-blue-50 p-4 rounded-xl text-left text-sm text-blue-700 mb-8 space-y-1">
+                <p><strong>🔥 教學競賽規則：</strong></p>
+                <p>1. <b>主場隊</b>：答對獲 100% 分數。</p>
+                <p>2. <b>他隊搶答</b>：答對獲 50% 分數。</p>
+                <p>3. <b>解釋獎勵</b>：額外獲得 50% 加分！</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="startGame(3)" class="p-4 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50 font-bold transition-all active:scale-95 text-slate-700">3 組</button>
+                <button onclick="startGame(4)" class="p-4 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50 font-bold transition-all active:scale-95 text-slate-700">4 組</button>
+                <button onclick="startGame(5)" class="p-4 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50 font-bold transition-all active:scale-95 text-slate-700">5 組</button>
+                <button onclick="startGame(6)" class="p-4 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50 font-bold transition-all active:scale-95 text-slate-700">6 組</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 遊戲主畫面 -->
+    <div id="game-screen" class="hidden min-h-screen p-4 md:p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="award" class="text-blue-600"></i>
+                    益智挑戰
+                </h1>
+                <div class="flex gap-2">
+                    <button onclick="showResetModal()" class="flex items-center gap-2 bg-white border border-slate-300 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+                        <i data-lucide="rotate-ccw" size="18"></i> 重新設定
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-6">
+                <div id="scoreboard" class="lg:w-32 flex lg:flex-col flex-row flex-wrap gap-2"></div>
+                <div class="flex-1 overflow-x-auto no-scrollbar">
+                    <div id="game-grid" class="grid grid-cols-6 gap-3 min-w-[800px]"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 題目主彈窗 -->
+    <div id="question-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-3xl w-full flex flex-col relative overflow-hidden animate-zoom-in h-[85vh] md:h-auto md:max-h-[90vh]">
+            <div class="absolute top-0 left-0 w-full h-2 bg-blue-600"></div>
+            
+            <!-- 頭部與控制項 -->
+            <div class="p-6 pb-2 flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <span id="modal-points" class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
+                        <i data-lucide="star" class="text-yellow-500" size="14"></i> 價值 0 分
+                    </span>
+                    <!-- 計時器顯示 -->
+                    <div id="timer-display" class="font-black text-xl text-slate-400 flex items-center gap-2">
+                        <i data-lucide="clock" size="18"></i>
+                        <span id="timer-seconds">--</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <!-- 字體大小控制 -->
+                    <div class="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
+                        <i data-lucide="type" size="14" class="mx-1 text-slate-400"></i>
+                        <button onclick="changeFontSize('text-xl', this)" class="font-size-btn px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors bg-white/50 text-slate-600">S</button>
+                        <button onclick="changeFontSize('text-3xl', this)" class="font-size-btn px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors bg-white/50 text-slate-600 font-btn-active">M</button>
+                        <button onclick="changeFontSize('text-5xl', this)" class="font-size-btn px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors bg-white/50 text-slate-600">L</button>
+                        <button onclick="changeFontSize('text-7xl', this)" class="font-size-btn px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors bg-white/50 text-slate-600">XL</button>
+                    </div>
+
+                    <!-- 計時器控制 -->
+                    <div id="timer-controls" class="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
+                        <button onclick="setTimer(10)" class="px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors">10s</button>
+                        <button onclick="setTimer(20)" class="px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors">20s</button>
+                        <button onclick="setTimer(30)" class="px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors">30s</button>
+                        <button onclick="setTimer(45)" class="px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors">45s</button>
+                        <button onclick="setTimer(60)" class="px-2 py-1 text-[10px] font-bold rounded-lg hover:bg-white transition-colors">1m</button>
+                        <div class="w-px h-4 bg-slate-300 mx-1"></div>
+                        <button id="timer-start-btn" onclick="startCountdown()" disabled class="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700 disabled:bg-slate-300">START</button>
+                    </div>
+                </div>
+
+                <button onclick="closeQuestionModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div id="modal-scroll-area" class="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar relative">
+                <!-- 題目遮蓋層 -->
+                <div id="timer-overlay" class="hidden absolute inset-0 z-50 bg-white/90 backdrop-blur-md flex flex-col items-center justify-center animate-fade-in text-center p-8">
+                    <div class="bg-red-100 text-red-600 p-8 rounded-full mb-4 animate-bounce">
+                        <i data-lucide="clock-alert" size="64"></i>
+                    </div>
+                    <h3 class="text-4xl font-black text-slate-800 mb-2">時間到！</h3>
+                    <p class="text-slate-500 font-bold mb-8">停止作答</p>
+                    <button onclick="dismissOverlay()" class="flex items-center gap-2 bg-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-bold hover:bg-slate-300 transition-all active:scale-95">
+                        <i data-lucide="eye" size="20"></i> 繼續查看題目
+                    </button>
+                </div>
+
+                <div class="flex flex-col items-center justify-center text-center py-8">
+                    <!-- 題目文字：初始為 text-3xl (M) -->
+                    <h2 id="modal-question-text" class="text-3xl font-bold text-slate-800 mb-10 leading-relaxed px-4 transition-all"></h2>
+                    <div id="answer-section">
+                        <button onclick="revealAnswer()" class="bg-slate-800 text-white px-10 py-4 rounded-2xl font-bold text-lg hover:bg-black transition-all active:scale-95 shadow-xl">
+                            查看正確答案
+                        </button>
+                    </div>
+                    <div id="revealed-answer" class="hidden bg-green-50 border-2 border-green-200 text-green-700 p-6 rounded-2xl w-full animate-fade-in max-w-2xl">
+                        <p class="text-[10px] font-bold uppercase mb-2 opacity-70">正確答案：</p>
+                        <p id="modal-answer-text" class="text-2xl md:text-3xl font-black"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 pt-3 border-t bg-slate-50 flex gap-3">
+                <button onclick="openScoringPanel()" class="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                    <i data-lucide="gavel" size="20"></i> 進行計分判定
+                </button>
+                <button onclick="nextTurn()" class="px-6 py-4 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-black shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                    下一題 <i data-lucide="chevron-right" size="20"></i>
+                </button>
+            </div>
+
+            <div id="scoring-panel" class="hidden absolute inset-0 bg-white z-[60] flex flex-col animate-fade-in">
+                <div class="p-6 border-b flex justify-between items-center bg-slate-50">
+                    <div>
+                        <h3 class="font-black text-slate-800 text-xl flex items-center gap-2">
+                            <i data-lucide="shield-check" class="text-blue-600"></i> 裁判計分
+                        </h3>
+                        <p id="home-team-hint" class="text-xs text-blue-600 font-bold mt-1"></p>
+                    </div>
+                    <button onclick="closeScoringPanel()" class="bg-white border shadow-sm text-slate-600 px-4 py-2 rounded-xl font-bold hover:bg-slate-100 flex items-center gap-2">
+                        完成計分 <i data-lucide="check" size="18"></i>
+                    </button>
+                </div>
+                <div id="modal-team-actions" class="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-3 custom-scrollbar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最終結果彈窗 -->
+    <div id="winner-modal" class="hidden fixed inset-0 bg-slate-900/95 flex flex-col items-center justify-center p-6 z-[100] animate-fade-in overflow-hidden">
+        <div id="confetti-container" class="absolute inset-0 pointer-events-none"></div>
+        <div class="max-w-md w-full text-center z-10">
+            <div class="w-32 h-32 bg-yellow-400 text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(250,204,21,0.5)] animate-bounce">
+                <i data-lucide="trophy" size="64"></i>
+            </div>
+            <h2 class="text-4xl font-black text-white mb-2 italic">GAME OVER</h2>
+            <p class="text-yellow-400 font-bold tracking-widest mb-10 text-xl uppercase">最終排名</p>
+            <div id="final-leaderboard" class="space-y-4 mb-12"></div>
+            <button onclick="confirmReset()" class="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black text-xl hover:bg-yellow-400 transition-all active:scale-95">再玩一局</button>
+        </div>
+    </div>
+
+    <!-- 分數手動編輯彈窗 -->
+    <div id="edit-score-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-xs w-full p-6 text-center animate-zoom-in">
+            <h3 id="edit-team-name" class="text-xl font-bold text-slate-800 mb-4">修正分數</h3>
+            <div class="flex items-center justify-center gap-4 mb-6">
+                <button onclick="adjustScore(-50)" class="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 font-bold">-50</button>
+                <div id="edit-score-value" class="text-3xl font-black text-blue-600 w-24">0</div>
+                <button onclick="adjustScore(50)" class="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 font-bold">+50</button>
+            </div>
+            <button onclick="closeEditScore()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold">完成修正</button>
+        </div>
+    </div>
+
+    <!-- 重置彈窗 -->
+    <div id="reset-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl max-sm w-full p-6 text-center animate-zoom-in">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="alert-triangle" size="32"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">返回設定？</h3>
+            <div class="flex gap-3 mt-6">
+                <button onclick="hideResetModal()" class="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-bold text-sm text-slate-600">取消</button>
+                <button onclick="confirmReset()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold text-sm">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const INITIAL_DATA = [
+            {
+                category: "第一課〈傘〉",
+                questions: [
+                    { points: 100, q: "下列選項「     」中的字，何組讀音前後相同？<br>(A)「幅」面/「副」本<br>(B)「懈」怠/「解」釋<br>(C)朝「暾」/「燉」煮<br>(D)涼「亭」/娉「婷」", a: "(D)涼「亭」/娉「婷」" },
+                    { points: 200, q: "下列選項「     」中的字，何組意思兩兩相同？<br>(A)車「載」斗量/怨聲「載」道<br>(B)「為」竿為杖/事在人「為」<br>(C)鳥翅「初」撲/「初」出茅廬<br>(D)一「幅」畫/「幅」員廣闊", a: "(C)鳥翅「初」撲/「初」出茅廬" },
+                    { points: 300, q: "「一傘在握  開闔自如」的含義，與下列何者最接近？<br>(A)有眼不識泰山<br>(B)人不可貌相，海水不可斗量<br>(C)每個人都是自己的命運建築師<br>(D)一寸光陰一寸金，寸金難買寸光陰", a: "(C)每個人都是自己的命運建築師" },
+                    { points: 400, q: "「客家語，油紙音轉成『有子』，且傘字有四人，象徵多子多福。傘開圓，寓意美滿團圓。女兒出閣，贈與一對紙傘。油紙傘，本為禦雨蔽日的民生所需，蛻化成為非物質文化遺產。」根據這段文字，下列何者最能說明「油紙傘的蛻化」？<br>(A)生活用品轉為文化遺產<br>(B)地方特色變成商業產品<br>(C)客家方言轉出吉祥諧音<br>(D)歷史考證變為民生所需", a: "(A)生活用品轉為文化遺產" }
+                ]
+            },
+            {
+                category: "第二課〈近體詩選〉-1",
+                questions: [
+                    { points: 100, q: "下列選項「     」中的字，何組讀音前後相同？<br>(A)「傳」記/「傳」遞書信<br>(B)「便」條/貪小「便」宜<br>(C)書「卷」/開「卷」有益<br>(D)欲擒故「縱」/「縱」橫交錯", a: "(C)書「卷」/開「卷」有益" },
+                    { points: 200, q: "下列詩句，何者上下句之間具有因果關係？<br>(A)明月松間照，清泉石上流<br>(B)隨意春芳歇，王孫自可留<br>(C)劍外忽傳收薊北，初聞涕淚滿衣裳<br>(D)白日放歌須縱酒，青春作伴好還鄉", a: "(C)劍外忽傳收薊北，初聞涕淚滿衣裳" },
+                    { points: 300, q: "關於〈山居秋暝〉一詩的敘述，下列何者正確？<br>前兩聯寫景，營造閒適的感覺；後兩聯抒情，道出美好的情調<br>(B)「明月、清泉、竹、蓮」表現山居秋天夜晚雨後的優雅、輕涼<br>(C)「泉流、竹喧、蓮動」在「月靜、山幽」的氣氛下顯得突兀、不協調<br>(D)作者寫「空山」、「雨後」、「晚來秋」，意在凸顯秋天的蕭條、冷清", a: "(B)「明月、清泉、竹、蓮」表現山居秋天夜晚雨後的優雅、輕涼" },
+                    { points: 400, q: "下列選項「     」中的詞語，何組意義前後相同？<br>(A)「白日」放歌須縱酒/「白日」依山盡<br>(B)千里江陵「一日」還/「一日」我遇見他<br>(C)「青春」作伴好還鄉/把握「青春」歲月<br>(D)「天氣」晚來秋/秋風蕭瑟「天氣」涼", a: "(D)「天氣」晚來秋/秋風蕭瑟「天氣」涼" }
+                ]
+            },
+            {
+                category: "第二課〈近體詩選〉-2",
+                questions: [
+                    { points: 100, q: "下列文句，何者用字完全正確？<br>(A)巧遇久別的國小同學，問她是否別來無樣<br>(B)學藝股長雖然才華橫溢，但仍相當的謙虛<br>(C)我終於親眼見到伍白圓鈔票上高悚的大霸尖山<br>(D)古代承相位居一人之下，萬人之上，掌握相當大的權勢", a: "(B)學藝股長雖然才華橫溢，但仍相當的謙虛" },
+                    { points: 200, q: "「輕舟已過萬重山」運用了誇飾修辭技巧，下列何者與之相同？<br>(A)劍外忽傳收薊北，初聞涕淚滿衣裳<br>(B)明月松間照，清泉石上流<br>(C)擇其善者而從之，其不善者而改之<br>(D)蟬噪林逾靜，鳥鳴山更幽", a: "(A)劍外忽傳收薊北，初聞涕淚滿衣裳" },
+                    { points: 300, q: "「竹喧歸浣女」是倒裝句型，還原後為「竹喧浣女歸」，依此判斷，下列何者不是倒裝句？<br>(A)黃河入海流<br>(B)明月松間照<br>(C)初聞涕淚滿衣裳<br>(D)江楓漁火對愁眠", a: "(C)初聞涕淚滿衣裳" },
+                    { points: 400, q: "關於〈聞官軍收河南河北〉一詩的敘述，下列何者正確？<br>(A)詩中人的情緒從驚訝到悲傷，再轉為狂喜<br>(B)從遊子的角度寫對異鄉戰亂平息的釋懷<br>(C)結尾連續出現的地名表現出作者渴望返鄉的心情<br>(D)由詩中可知作者寫作的季節與其經濟狀況", a: "(C)結尾連續出現的地名表現出作者渴望返鄉的心情" }
+                ]
+            },
+            {
+                category: "第二課〈近體詩選〉-3",
+                questions: [
+                    { points: 100, q: "下列選項「     」中的注音寫成國字後，何組字形前後相同？<br>(A)「ㄏㄢˋ」聯/遺「ㄏㄢˋ」<br>(B)「ㄒㄧㄝ」息/停「ㄒㄧㄝ」<br>(C)「ㄒㄩㄢ」譁/「ㄒㄩㄢ」傳<br>(D)迷「ㄇㄢˋ」/舞姿「ㄇㄢˋ」妙", a: "(B)「ㄒㄧㄝ」息/停「ㄒㄧㄝ」" },
+                    { points: 200, q: "下列文句「     」中的成語，何者運用最恰當？<br>(A)他的個性「多愁善感」，從來不會因為同情他人而掉淚<br>(B)這家公司在他「目光短淺」的領導下，業績蒸蒸日上<br>(C)闊別十年，他終於踏上「魂牽夢縈」的故鄉土地<br>(D)活動快要結束的時候，大家都顯得「曲終人散」，難分難捨", a: "(C)闊別十年，他終於踏上「魂牽夢縈」的故鄉土地" },
+                    { points: 300, q: "「對偶」為詞性相同、字數相等、結構相似，有時還講究平仄相對的一種修辭技巧，依此判斷，下列何者為對偶句？<br>(A)紅顏棄軒冕，白首臥松雲<br>(B)春風不相識，何事入羅幃<br>(C)相望試登高，心隨雁飛滅<br>(D)世情惡衰歇，萬事隨轉燭", a: "(A)紅顏棄軒冕，白首臥松雲" },
+                    { points: 400, q: "關於〈早發白帝城〉一詩的敘述，下列何者錯誤？<br>(A)「朝辭白帝彩雲間」扣題，點名啟程的時間地點<br>(B)「千里江陵一日還」以空間之遠對比時間之短，反映出遇赦返還的愉快心情<br>(C)兩岸猿聲啼不住」藉不絕於耳的淒苦猿聲，彰顯流落異地的遊子鄉愁<br>(D)「輕舟已過萬重山」既是輕捷明快之景，亦含輕快雀躍之情", a: "(C)兩岸猿聲啼不住」藉不絕於耳的淒苦猿聲，彰顯流落異地的遊子鄉愁" }
+                ]
+            },
+            {
+                category: "第三課〈四種讀書的方法〉",
+                questions: [
+                    { points: 100, q: "下列「     」中的字，何者去掉部首後，字音不變？<br>(A)平「均」<br>(B)蘆「葦」<br>(C)洶「湧」<br>(D)澎「湃」", a: "(C)洶「湧」" },
+                    { points: 200, q: "下列文句「     」中的詞語，何者使用最恰當？<br>(A)面對當前經濟形勢，我「傾向」於保守投資策略<br>(B)新的體育館已進入收尾階段，「久之」便將完工<br>(C)創業者應勇敢踏出第一步，「擔任」未知的風險<br>(D)這種瑣碎麻煩的事，他「自然」毫不猶豫答應了", a: "(A)面對當前經濟形勢，我「傾向」於保守投資策略" },
+                    { points: 300, q: "下列文句「     」中的成語，何者運用完全正確？<br>(A)曉華「絞盡腦汁」就能迅速補完對聯的缺空處，內容既巧妙又流暢<br>(B)她苦思冥想卻想不出文章，已經到了「七步成詩」的地步<br>(C)只見爺爺一提筆，便「嘔心瀝血」地創作出這幅山水畫<br>(D)她寫不出好文章，並非「江郎才盡」，而是缺乏生活閱歷", a: "(D)她寫不出好文章，並非「江郎才盡」，而是缺乏生活閱歷" },
+                    { points: 400, q: "下列選項中的文句，何者沒有冗詞贅字？<br>(A)識字卻不閱讀的人，和不識字的人沒什麼不同的區別<br>(B)如果讀書若沒有深入思考，就像吃東西不經消化一樣<br>(C)讀一篇優良的佳作，就像是和一位品德高尚的人談話<br>(D)閱讀是使用別人的頭腦思考，而非僅依賴自己的思維", a: "(D)閱讀是使用別人的頭腦思考，而非僅依賴自己的思維" }
+                ]
+            },
+            {
+                category: "語文天地一_文字構造介紹",
+                questions: [
+                    { points: 100, q: "關於下列各自的造字法則，何者說明正確？<br>(A)耳：象形<br>(B)漫：指事<br>(C)涉：形聲<br>(D)下：會意", a: "(A)耳：象形" },
+                    { points: 200, q: "關於形聲字的分類，下列何者正確？<br>(A)內形外聲：闢、園<br>(B)上形下聲：簡、烈<br>(C)左形右聲：誠：時<br>(D)右形左聲：軀、頂", a: "(C)左形右聲：誠：時" },
+                    { points: 300, q: "指鹿為「馬」、瓜「田」李下、紅「瓦」白牆、自相「矛」盾。以上「     」中的字，皆屬於造字法則中的哪一種？<br>(A)象形<br>(B)指事<br>(C)會意<br>(D)形聲", a: "(A)象形" },
+                    { points: 400, q: "下列哪一組文字的造字法則前後不同？<br>(A)雨、舟<br>(B)雞、鴨<br>(C)計、鯉<br>(D)八、末", a: "(C)計、鯉" }
+                ]
+            }
+        ];
+
+        const TEAM_STYLES = [
+            { color: "border-red-500 bg-red-50 text-red-700", ring: "ring-red-400" },
+            { color: "border-orange-500 bg-orange-50 text-orange-700", ring: "ring-orange-400" },
+            { color: "border-yellow-500 bg-yellow-50 text-yellow-700", ring: "ring-yellow-400" },
+            { color: "border-green-500 bg-green-50 text-green-700", ring: "ring-green-400" },
+            { color: "border-blue-500 bg-blue-50 text-blue-700", ring: "ring-blue-400" },
+            { color: "border-purple-500 bg-purple-50 text-purple-700", ring: "ring-purple-400" },
+        ];
+
+        let state = { 
+            teams: [], 
+            activeTeamIndex: 0, 
+            usedQuestions: new Set(), 
+            currentQuestion: null, 
+            currentUsedActions: new Set(), 
+            editTeamId: null,
+            timerId: null,
+            timeLeft: 0
+        };
+
+        window.onload = () => lucide.createIcons();
+
+        function startGame(count) {
+            state.teams = Array.from({ length: count }, (_, i) => ({ id: i + 1, name: `Team ${i + 1}`, score: 0, style: TEAM_STYLES[i] }));
+            state.activeTeamIndex = 0;
+            state.usedQuestions = new Set();
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('winner-modal').classList.add('hidden');
+            renderScoreboard();
+            renderGrid();
+        }
+
+        function renderScoreboard() {
+            const container = document.getElementById('scoreboard');
+            container.innerHTML = state.teams.map((team, idx) => `
+                <div class="flex-1 lg:flex-initial border-2 rounded-xl p-2 transition-all relative ${team.style.color} ${state.activeTeamIndex === idx ? `ring-4 ring-offset-1 ${team.style.ring}` : 'opacity-80 shadow-sm'}">
+                    ${state.activeTeamIndex === idx ? '<div class="absolute top-1 left-1 w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse border-2 border-white shadow-sm"></div>' : ''}
+                    <button onclick="openEditScore(${team.id})" class="absolute top-1 right-1 p-1 opacity-0 hover:opacity-100 transition-opacity bg-white/50 rounded hover:bg-white">
+                        <i data-lucide="edit-3" size="10"></i>
+                    </button>
+                    <div class="text-center font-bold text-[10px] uppercase tracking-tighter mb-0.5 truncate">${team.name}</div>
+                    <div class="text-center text-xl md:text-2xl font-black ${team.score < 0 ? 'text-red-600' : ''}">${team.score}</div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('game-grid');
+            let html = '';
+            INITIAL_DATA.forEach(cat => { html += `<div class="bg-slate-700 text-white p-4 rounded-xl text-center font-bold h-24 flex items-center justify-center leading-tight shadow-md">${cat.category}</div>`; });
+            for (let qIdx = 0; qIdx < 4; qIdx++) {
+                INITIAL_DATA.forEach((cat, catIdx) => {
+                    const id = `${catIdx}-${qIdx}`;
+                    const isUsed = state.usedQuestions.has(id);
+                    html += `<button onclick="handleTileClick(${catIdx}, ${qIdx})" ${isUsed ? 'disabled' : ''} class="h-28 rounded-xl border-2 text-3xl font-black transition-all flex items-center justify-center shadow-sm ${isUsed ? 'bg-slate-200 border-slate-200 text-slate-400 cursor-default' : 'bg-white border-slate-300 text-slate-700 hover:scale-105 hover:bg-blue-50 active:scale-95'}">${cat.questions[qIdx].points}</button>`;
+                });
+            }
+            grid.innerHTML = html;
+        }
+
+        function handleTileClick(catIdx, qIdx) {
+            const id = `${catIdx}-${qIdx}`;
+            state.currentQuestion = { ...INITIAL_DATA[catIdx].questions[qIdx], id };
+            state.currentUsedActions = new Set();
+            
+            stopTimer();
+            state.timeLeft = 0;
+            updateTimerUI();
+            
+            document.getElementById('timer-overlay').classList.add('hidden');
+            document.getElementById('modal-scroll-area').scrollTop = 0;
+            document.getElementById('scoring-panel').classList.add('hidden');
+            document.getElementById('modal-points').innerHTML = `<i data-lucide="star" class="text-yellow-500" size="14"></i> 價值 ${state.currentQuestion.points} 分`;
+            document.getElementById('modal-question-text').innerHTML = state.currentQuestion.q;
+            document.getElementById('modal-answer-text').innerHTML = state.currentQuestion.a;
+            
+            document.getElementById('home-team-hint').innerText = `主場：${state.teams[state.activeTeamIndex].name}`;
+            document.getElementById('answer-section').classList.remove('hidden');
+            document.getElementById('revealed-answer').classList.add('hidden');
+            
+            // 每次開題預設中字體 (M)
+            const defaultBtn = document.querySelector('button[onclick*="text-3xl"]');
+            changeFontSize('text-3xl', defaultBtn);
+
+            renderActionButtons();
+            document.getElementById('question-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        // --- 字體切換邏輯 ---
+        function changeFontSize(sizeClass, btn) {
+            const questionText = document.getElementById('modal-question-text');
+            // 移除所有可能的字體大小類別
+            questionText.classList.remove('text-xl', 'text-2xl', 'text-3xl', 'text-4xl', 'text-5xl', 'text-6xl', 'text-7xl');
+            // 加入新的
+            questionText.classList.add(sizeClass);
+            
+            // 更新按鈕樣式
+            document.querySelectorAll('.font-size-btn').forEach(b => b.classList.remove('font-btn-active'));
+            btn.classList.add('font-btn-active');
+        }
+
+        function setTimer(seconds) {
+            stopTimer();
+            state.timeLeft = seconds;
+            updateTimerUI();
+            document.getElementById('timer-overlay').classList.add('hidden');
+            document.getElementById('timer-start-btn').disabled = false;
+        }
+
+        function startCountdown() {
+            if (state.timeLeft <= 0) return;
+            document.getElementById('timer-start-btn').disabled = true;
+            
+            state.timerId = setInterval(() => {
+                state.timeLeft--;
+                updateTimerUI();
+                
+                if (state.timeLeft <= 0) {
+                    stopTimer();
+                    document.getElementById('timer-overlay').classList.remove('hidden');
+                    lucide.createIcons();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (state.timerId) {
+                clearInterval(state.timerId);
+                state.timerId = null;
+            }
+            document.getElementById('timer-start-btn').disabled = (state.timeLeft <= 0);
+        }
+
+        function dismissOverlay() {
+            document.getElementById('timer-overlay').classList.add('hidden');
+        }
+
+        function updateTimerUI() {
+            const display = document.getElementById('timer-seconds');
+            const wrapper = document.getElementById('timer-display');
+            
+            if (state.timeLeft <= 0 && state.timerId === null) {
+                display.innerText = state.timeLeft === 0 && state.usedQuestions.has(state.currentQuestion?.id) ? "--" : "00";
+            } else {
+                display.innerText = state.timeLeft + "s";
+            }
+
+            if (state.timerId) {
+                wrapper.classList.add('text-blue-600');
+                wrapper.classList.remove('text-slate-400');
+            } else {
+                wrapper.classList.remove('text-blue-600');
+                wrapper.classList.add('text-slate-400');
+            }
+
+            if (state.timeLeft > 0 && state.timeLeft <= 5) {
+                wrapper.classList.add('timer-warning');
+            } else {
+                wrapper.classList.remove('timer-warning');
+            }
+        }
+
+        function applyScore(teamId, multiplier, actionType) {
+            const team = state.teams.find(t => t.id === teamId);
+            const actionKey = `${actionType}-${teamId}`;
+            if (team && !state.currentUsedActions.has(actionKey)) {
+                team.score += Math.round(state.currentQuestion.points * multiplier);
+                state.currentUsedActions.add(actionKey);
+                renderScoreboard();
+                renderActionButtons();
+                if (multiplier > 0) revealAnswer();
+            }
+        }
+
+        function openEditScore(teamId) {
+            state.editTeamId = teamId;
+            const team = state.teams.find(t => t.id === teamId);
+            document.getElementById('edit-team-name').innerText = `修正 ${team.name} 分數`;
+            document.getElementById('edit-score-value').innerText = team.score;
+            document.getElementById('edit-score-modal').classList.remove('hidden');
+        }
+
+        function adjustScore(amount) {
+            const team = state.teams.find(t => t.id === state.editTeamId);
+            if (team) {
+                team.score += amount;
+                document.getElementById('edit-score-value').innerText = team.score;
+                renderScoreboard();
+            }
+        }
+
+        function closeEditScore() { document.getElementById('edit-score-modal').classList.add('hidden'); }
+        function openScoringPanel() { document.getElementById('scoring-panel').classList.remove('hidden'); lucide.createIcons(); }
+        function closeScoringPanel() { document.getElementById('scoring-panel').classList.add('hidden'); }
+        
+        function revealAnswer() { 
+            document.getElementById('timer-overlay').classList.add('hidden');
+            document.getElementById('answer-section').classList.add('hidden'); 
+            document.getElementById('revealed-answer').classList.remove('hidden'); 
+        }
+        
+        function nextTurn() {
+            stopTimer();
+            state.usedQuestions.add(state.currentQuestion.id);
+            state.activeTeamIndex = (state.activeTeamIndex + 1) % state.teams.length;
+            closeQuestionModal();
+            renderScoreboard();
+            renderGrid();
+            checkGameOver();
+        }
+
+        function checkGameOver() {
+            if (state.usedQuestions.size === 24) { showWinners(); }
+        }
+
+        function showWinners() {
+            const sortedTeams = [...state.teams].sort((a, b) => b.score - a.score);
+            const leaderboard = document.getElementById('final-leaderboard');
+            leaderboard.innerHTML = sortedTeams.map((team, idx) => `
+                <div class="flex items-center gap-4 bg-white/10 p-4 rounded-2xl border border-white/20 backdrop-blur-md">
+                    <div class="text-3xl font-black text-yellow-400 w-8">#${idx + 1}</div>
+                    <div class="flex-1 text-left text-white font-bold text-xl">${team.name}</div>
+                    <div class="text-2xl font-black text-white">${team.score}</div>
+                </div>
+            `).join('');
+            
+            const container = document.getElementById('confetti-container');
+            container.innerHTML = '';
+            for(let i=0; i<100; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti';
+                conf.style.left = Math.random() * 100 + 'vw';
+                conf.style.backgroundColor = ['#fde047', '#3b82f6', '#ef4444', '#22c55e'][Math.floor(Math.random()*4)];
+                conf.style.animationDelay = Math.random() * 3 + 's';
+                container.appendChild(conf);
+            }
+            document.getElementById('winner-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function renderActionButtons() {
+            const teamActions = document.getElementById('modal-team-actions');
+            teamActions.innerHTML = state.teams.map((team, idx) => {
+                const isHome = (idx === state.activeTeamIndex);
+                const isPlusUsed = state.currentUsedActions.has(`plus-${team.id}`);
+                const isBonusUsed = state.currentUsedActions.has(`bonus-${team.id}`);
+                const isMinusUsed = state.currentUsedActions.has(`minus-${team.id}`);
+                return `
+                <div class="flex flex-col gap-2 p-3 rounded-2xl border ${isHome ? 'team-row-active border-blue-400 bg-blue-50/30' : 'border-slate-200 bg-white shadow-sm'}">
+                    <div class="flex items-center justify-between font-bold text-slate-700 text-sm px-1 truncate">
+                        <span class="truncate">${team.name}</span>
+                        ${isHome ? '<span class="text-[10px] bg-blue-600 text-white px-2 rounded-full py-0.5">主場</span>' : ''}
+                    </div>
+                    <div class="flex gap-2">
+                        <button ${isPlusUsed ? 'disabled' : ''} onclick="applyScore(${team.id}, ${isHome ? 1 : 0.5}, 'plus')" class="flex-1 py-3 bg-green-500 text-white rounded-xl text-xs font-black hover:bg-green-600 transition-all active:scale-90">+${isHome ? '100%' : '50%'}</button>
+                        <button ${isBonusUsed ? 'disabled' : ''} onclick="applyScore(${team.id}, 0.5, 'bonus')" class="flex-1 py-3 bg-yellow-500 text-white rounded-xl text-xs font-black hover:bg-yellow-600 transition-all active:scale-90">+解釋</button>
+                        <button ${isMinusUsed ? 'disabled' : ''} onclick="applyScore(${team.id}, -1, 'minus')" class="px-4 py-3 bg-red-100 text-red-600 rounded-xl text-xs font-black hover:bg-red-200 transition-all active:scale-90">-100%</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function closeQuestionModal() { 
+            stopTimer();
+            document.getElementById('question-modal').classList.add('hidden'); 
+        }
+        function showResetModal() { document.getElementById('reset-modal').classList.remove('hidden'); lucide.createIcons(); }
+        function hideResetModal() { document.getElementById('reset-modal').classList.add('hidden'); }
+        function confirmReset() { hideResetModal(); document.getElementById('game-screen').classList.add('hidden'); document.getElementById('winner-modal').classList.add('hidden'); document.getElementById('setup-screen').classList.remove('hidden'); }
+    </script>
+</body>
+</html>
